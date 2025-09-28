@@ -1,0 +1,269 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.TransactionController = void 0;
+const transactionService_1 = require("../services/transactionService");
+const transactionService = new transactionService_1.TransactionService();
+class TransactionController {
+    async createTransaction(req, res) {
+        try {
+            if (!req.user) {
+                res.status(401).json({
+                    success: false,
+                    message: 'Authentication required to create transaction'
+                });
+                return;
+            }
+            const { type, category, amount, note, date } = req.body;
+            if (!type || !category || amount === undefined) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Missing required fields: type, category, and amount are required'
+                });
+                return;
+            }
+            if (!['income', 'expense'].includes(type)) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Type must be either "income" or "expense"'
+                });
+                return;
+            }
+            if (typeof amount !== 'number' || amount <= 0) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Amount must be a positive number'
+                });
+                return;
+            }
+            if (typeof category !== 'string' || category.trim().length === 0) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Category must be a non-empty string'
+                });
+                return;
+            }
+            const transaction = await transactionService.createTransaction({
+                type,
+                category: category.trim(),
+                amount,
+                note: note?.trim() || undefined,
+                date
+            }, req.user.id);
+            res.status(201).json({
+                success: true,
+                message: 'Transaction created successfully',
+                data: transaction
+            });
+        }
+        catch (error) {
+            console.error('Error creating transaction:', error);
+            res.status(500).json({
+                success: false,
+                message: error instanceof Error ? error.message : 'Internal server error'
+            });
+        }
+    }
+    async getAllTransactions(req, res) {
+        try {
+            if (!req.user) {
+                res.status(401).json({
+                    success: false,
+                    message: 'Authentication required to fetch transactions'
+                });
+                return;
+            }
+            const queryParams = {
+                type: req.query.type,
+                category: req.query.category,
+                startDate: req.query.startDate,
+                endDate: req.query.endDate,
+                limit: req.query.limit ? parseInt(req.query.limit) : undefined,
+                offset: req.query.offset ? parseInt(req.query.offset) : undefined
+            };
+            if (queryParams.type && !['income', 'expense'].includes(queryParams.type)) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Type query parameter must be either "income" or "expense"'
+                });
+                return;
+            }
+            if (queryParams.limit && (isNaN(queryParams.limit) || queryParams.limit <= 0)) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Limit must be a positive number'
+                });
+                return;
+            }
+            if (queryParams.offset && (isNaN(queryParams.offset) || queryParams.offset < 0)) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Offset must be a non-negative number'
+                });
+                return;
+            }
+            const transactions = await transactionService.getAllTransactions(req.user.id, queryParams);
+            res.status(200).json({
+                success: true,
+                message: 'Transactions retrieved successfully',
+                data: transactions,
+                count: transactions.length
+            });
+        }
+        catch (error) {
+            console.error('Error fetching transactions:', error);
+            res.status(500).json({
+                success: false,
+                message: error instanceof Error ? error.message : 'Internal server error'
+            });
+        }
+    }
+    async getTransactionById(req, res) {
+        try {
+            if (!req.user) {
+                res.status(401).json({
+                    success: false,
+                    message: 'Authentication required to fetch transaction'
+                });
+                return;
+            }
+            const { id } = req.params;
+            if (!id) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Transaction ID is required'
+                });
+                return;
+            }
+            const transaction = await transactionService.getTransactionById(id, req.user.id);
+            res.status(200).json({
+                success: true,
+                message: 'Transaction retrieved successfully',
+                data: transaction
+            });
+        }
+        catch (error) {
+            console.error('Error fetching transaction:', error);
+            if (error instanceof Error && error.message === 'Transaction not found') {
+                res.status(404).json({
+                    success: false,
+                    message: 'Transaction not found'
+                });
+            }
+            else {
+                res.status(500).json({
+                    success: false,
+                    message: error instanceof Error ? error.message : 'Internal server error'
+                });
+            }
+        }
+    }
+    async updateTransaction(req, res) {
+        try {
+            if (!req.user) {
+                res.status(401).json({
+                    success: false,
+                    message: 'Authentication required to update transaction'
+                });
+                return;
+            }
+            const { id } = req.params;
+            const updateData = req.body;
+            if (!id) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Transaction ID is required'
+                });
+                return;
+            }
+            if (updateData.type && !['income', 'expense'].includes(updateData.type)) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Type must be either "income" or "expense"'
+                });
+                return;
+            }
+            if (updateData.amount !== undefined && (typeof updateData.amount !== 'number' || updateData.amount <= 0)) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Amount must be a positive number'
+                });
+                return;
+            }
+            if (updateData.category !== undefined && (typeof updateData.category !== 'string' || updateData.category.trim().length === 0)) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Category must be a non-empty string'
+                });
+                return;
+            }
+            if (updateData.category) {
+                updateData.category = updateData.category.trim();
+            }
+            if (updateData.note !== undefined) {
+                updateData.note = updateData.note?.trim() || undefined;
+            }
+            const transaction = await transactionService.updateTransaction(id, updateData, req.user.id);
+            res.status(200).json({
+                success: true,
+                message: 'Transaction updated successfully',
+                data: transaction
+            });
+        }
+        catch (error) {
+            console.error('Error updating transaction:', error);
+            if (error instanceof Error && error.message === 'Transaction not found') {
+                res.status(404).json({
+                    success: false,
+                    message: 'Transaction not found'
+                });
+            }
+            else {
+                res.status(500).json({
+                    success: false,
+                    message: error instanceof Error ? error.message : 'Internal server error'
+                });
+            }
+        }
+    }
+    async deleteTransaction(req, res) {
+        try {
+            if (!req.user) {
+                res.status(401).json({
+                    success: false,
+                    message: 'Authentication required to delete transaction'
+                });
+                return;
+            }
+            const { id } = req.params;
+            if (!id) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Transaction ID is required'
+                });
+                return;
+            }
+            await transactionService.deleteTransaction(id, req.user.id);
+            res.status(200).json({
+                success: true,
+                message: 'Transaction deleted successfully'
+            });
+        }
+        catch (error) {
+            console.error('Error deleting transaction:', error);
+            if (error instanceof Error && error.message === 'Transaction not found') {
+                res.status(404).json({
+                    success: false,
+                    message: 'Transaction not found'
+                });
+            }
+            else {
+                res.status(500).json({
+                    success: false,
+                    message: error instanceof Error ? error.message : 'Internal server error'
+                });
+            }
+        }
+    }
+}
+exports.TransactionController = TransactionController;
+//# sourceMappingURL=transactionController.js.map
